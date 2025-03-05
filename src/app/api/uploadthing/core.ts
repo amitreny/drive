@@ -20,26 +20,34 @@ export const ourFileRouter = {
     },
   })
     // Set permissions and file types for this FileRoute
-    .middleware(async () => {
-      // This code runs on your server before upload
-      const user = await auth();
-      // If you throw, the user will not be able to upload
-      if (!user?.userId) throw new UploadThingError("Unauthorized");
+.middleware(async () => {
+  try {
+    // Attempt to authenticate the user
+    const user = await auth();
 
-      // Whatever is returned here is accessible in onUploadComplete as `metadata`
-      return { userId: user.userId };
-    })
+    // Check if the user exists, otherwise throw an error
+    if (!user?.userId) throw new UploadThingError("Unauthorized");
+
+    // Return metadata if authentication is successful
+    return { userId: user.userId };
+  } catch (error) {
+    console.error("Error in UploadThing middleware:", error);
+
+    // Rethrow the error to prevent upload if authentication fails
+    throw new UploadThingError(error instanceof Error ? error.message : "Unknown error occurred");
+  }
+})
     .onUploadComplete(async ({ metadata, file }) => {
       // This code RUNS ON YOUR SERVER after upload
       console.log("Upload complete for userId:", metadata.userId);
 
-      console.log("file url", file.url);
+      console.log("file url", file.ufsUrl);
 
       await MUTATIONS.createFile({
         file:{
             name: file.name,
             size: file.size,
-            url: file.url,
+            url: file.ufsUrl,
             parent: 0,
         },
         userId: metadata.userId,
